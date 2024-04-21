@@ -12,7 +12,7 @@ sys.path.insert(0, '.')
 here = os.path.dirname(os.path.abspath(__file__))
 
 from utils import *
-
+from timeit import default_timer as timer
 
 # 加载数据集
 data_path = os.path.join(here, "PEMS03_num31.npz")
@@ -34,41 +34,52 @@ train_data = data_normalized[:train_size]
 valid_data = data_normalized[train_size:train_size+valid_size]
 test_data = data_normalized[train_size+valid_size:]
 
-fits1 = {
-    k: sm.tsa.UnobservedComponents(
-        train_data,
-        level=True, trend=True,
-        #cycle=True,
-        freq_seasonal=[{'period':288,'harmonics':k},
-                      {'period':2016,'harmonics':1}]
-        ).fit()
-    for k in range(1, 10)
-}
+periodic = [12, 288]
 
-fits2 = {
-    k: sm.tsa.UnobservedComponents(
-        train_data,
-        level=True, trend=True,
-        #cycle=True,
-        freq_seasonal=[{'period':288,'harmonics':1},
-                      {'period':2016,'harmonics':k}]
-        ).fit()
-    for k in range(1, 210)
-}
+fits = [{
+        k: sm.tsa.UnobservedComponents(
+            train_data,
+            level=True, trend=True,
+            #cycle=True,
+            freq_seasonal=[{'period':q,'harmonics':[1,k][p==q] } for q in periodic]
+            ).fit()
+        for k in range(1, 10)
+    }
+    for p in periodic
+]
 
-mse1 = [((fits1[f].get_forecast(test_size).predicted_mean - test_data)**2).mean(axis=None) for f in fits1]
-k1 = list(fits1.keys())[mse1.index(min(mse1))]
-mse2 = [((fits2[f].get_forecast(test_size).predicted_mean - test_data)**2).mean(axis=None) for f in fits2]
-k2 = list(fits2.keys())[mse2.index(min(mse2))]
+def mse_test_data (data):
+    return ((data-test_data)**2).mean(axis=None)
 
+def find_max_k(models):
+    min_mse = 99
+    out = 1
+    ms=[]
+    for k, fit in models.items():
+        m = mse_test_data(fit.get_forecast(valid_size+test_size).predicted_mean[valid_size:])
+        print(m)
+        ms.append(m)
+        if  m < min_mse:
+            out = k 
+            min_mse = m
+        
+    return out
+
+ks = [find_max_k(f) for f in fits]
+
+start = timer()
 best_fit = sm.tsa.UnobservedComponents(
         train_data,
         level=True, trend=True,
         #cycle=True,
-        freq_seasonal=[{'period':288,'harmonics':k1},
-                      {'period':2016,'harmonics':k2}]
+        freq_seasonal=[{'period':p,'harmonics':k} for p,k in zip(periodic, ks)]
         ).fit()
+end = timer()
+print('runtime is: ', end -start)
+
 mse = ((best_fit.get_forecast(test_size).predicted_mean - test_data)**2).mean(axis=None) 
+
+
 
 def show2plot():
     fig, ax = plt.subplots(1, 2, figsize=(7,7), sharex=True, sharey=True, dpi=120)
@@ -103,13 +114,14 @@ def show1plot():
     ax.plot(fc.predicted_mean, label='Predictions')
 
     ax.legend()
-
-    ax.text(.1, .95, f'$k1={k1}$\n$k2={k2}$\nMSE = {mse}', va='top', transform=ax.transAxes)
+    
+    ks_text = '\n'.join([f'$k{i}={k}$' for i, k in enumerate(ks)])
+    ax.text(.1, .95, f'{ks_text}\nMSE = {mse}', va='top', transform=ax.transAxes)
     fig.text(0, .5, 'Turnover', rotation=90, va='center')
     plt.tight_layout()
 
-#show1plot()
+show1plot()
 best_fit.plot_components()
+print(best_fit.summary())
 
-print(mse, '\n', mse1,'\n',mse2)
 plt.show()
