@@ -2,10 +2,7 @@ import numpy as np
 from scipy.optimize import leastsq
 import pylab as plt
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ExpSineSquared
 from sklearn.impute import SimpleImputer
-import pandas as pd
 import os
 import sys
 sys.path.insert(0, '.')
@@ -62,7 +59,6 @@ def find_max_k(models):
         if  m < min_mse:
             out = k 
             min_mse = m
-        
     return out
 
 ks = [find_max_k(f) for f in fits]
@@ -114,10 +110,11 @@ def show1plot():
     ax.plot(fc.predicted_mean, label='Predictions')
 
     ax.legend()
+    plt.xlabel("Time")
+    plt.ylabel("Traffic Flow")
     
     ks_text = '\n'.join([f'$k{i}={k}$' for i, k in enumerate(ks)])
     ax.text(.1, .95, f'{ks_text}\nMSE = {mse}', va='top', transform=ax.transAxes)
-    fig.text(0, .5, 'Turnover', rotation=90, va='center')
     plt.tight_layout()
 
 show1plot()
