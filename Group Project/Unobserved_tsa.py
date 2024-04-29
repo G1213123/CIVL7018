@@ -1,10 +1,11 @@
 import numpy as np
-from scipy.optimize import leastsq
+from sklearn.metrics import r2_score
 import pylab as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.impute import SimpleImputer
 import os
 import sys
+import pandas as pd
 sys.path.insert(0, '.')
 here = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,6 +33,7 @@ valid_data = data_normalized[train_size:train_size+valid_size]
 test_data = data_normalized[train_size+valid_size:]
 
 periodic = [12, 288]
+k_range = 10
 
 fits = [{
         k: sm.tsa.UnobservedComponents(
@@ -40,7 +42,7 @@ fits = [{
             #cycle=True,
             freq_seasonal=[{'period':q,'harmonics':[1,k][p==q] } for q in periodic]
             ).fit()
-        for k in range(1, 10)
+        for k in range(1, k_range+1)
     }
     for p in periodic
 ]
@@ -48,7 +50,21 @@ fits = [{
 def mse_test_data (data):
     return ((data-test_data)**2).mean(axis=None)
 
+def mae_test_data (data):
+    return (np.absolute(data-test_data)).mean(axis=None)
+
+def rsquared_test_data (data):
+    return r2_score(test_data, data)
+
+def iterating_k(models):
+    index = pd.DataFrame(range(1,k_range), columns=['k'])
+    data = [fit.get_forecast(valid_size+test_size).predicted_mean[valid_size:] for fit in models]
+    index['mse '] = [mse_test_data(fit.get_forecast(valid_size+test_size).predicted_mean[valid_size:]) for fit in models]
+    data = fit.get_forecast(valid_size+test_size).predicted_mean[valid_size:]
+
 def find_max_k(models):
+    k_index = pd.DataFrame(range(1,k_range), columns=['k'])
+    data = fit.get_forecast(valid_size+test_size).predicted_mean[valid_size:]
     min_mse = 99
     out = 1
     ms=[]
