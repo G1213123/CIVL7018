@@ -15,7 +15,7 @@ from utils import *
 from timeit import default_timer as timer
 
 # 加载数据集
-data_path = os.path.join(here, "PEMS03_num31.npz")
+data_path = os.path.join(here, "PEMS03.npz")
 data = np.load(data_path)['data']
 
 # 数据预处理
